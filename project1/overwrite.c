@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 	        overwritedFileLength = fileSize;
 
 	lseek(fd, 0, SEEK_SET);
-	buffer = (char *)malloc(overwritedFileLength);
+	buffer = (char *)calloc(overwritedFileLength, sizeof(char));
 	if(buffer == NULL){
 		fprintf(stderr, "malloc error\n");
 		exit(1);
@@ -55,10 +55,12 @@ int main(int argc, char *argv[])
 	entry = buffer;
 	while((length = read(fd, entry, READ_WRITE_BYTES)) > 0)
 		entry += length;
-
 	close(fd);
+
+	if(offset > fileSize && *(entry - 1) == '\n')
+		*(entry - 1) = 0;
 	
-	for(i = 0; argv[3][i] != 0; ++i)
+	for(i = 0; i < strlen(argv[3]); ++i)
 		buffer[offset + i] = argv[3][i];
 
 	if((fd = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC)) < 0){
