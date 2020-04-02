@@ -1,11 +1,8 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-//í•„ìš”í•˜ë©´ header file ì¶”ê°€ ê°€ëŠ¥
+//¿¿¿¿ header file ¿¿ ¿¿
 
 //
-// argv[1]: ë ˆì½”ë“œ íŒŒì¼ëª…
+// argv[1]: ¿¿¿ ¿¿¿
 //
 
 #define ID_LENGTH 20
@@ -14,8 +11,8 @@
 
 int main(int argc, char **argv)
 {
-	// í‘œì¤€ì…ë ¥ìœ¼ë¡œ ë°›ì€ ë ˆì½”ë“œ íŒŒì¼ì— ì €ì¥ë˜ì–´ ìˆëŠ” ì „ì²´ ë ˆì½”ë“œë¥¼ "ìˆœì°¨ì "ìœ¼ë¡œ ì½ì–´ë“¤ì´ê³ , ì´ë•Œ
-	// ê±¸ë¦¬ëŠ” ì‹œê°„ì„ ì¸¡ì •í•˜ëŠ” ì½”ë“œ êµ¬í˜„í•¨
+	// ¿¿¿¿¿¿ ¿¿ ¿¿¿ ¿¿¿ ¿¿¿¿ ¿¿ ¿¿ ¿¿¿¿ "¿¿¿"¿¿ ¿¿¿¿¿, ¿¿
+	// ¿¿¿ ¿¿¿ ¿¿¿¿ ¿¿ ¿¿¿
 	struct student {
 		char id[ID_LENGTH];
 		char name[NAME_LENGTH];
@@ -35,7 +32,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	if((fileSize = lseek(fd, 0, SEEK_SET)) < 0) { // lseek ì‚¬ìš©í•˜ë©´ íŒŒì¼ ëê¹Œì§€ ë©”ëª¨ë¦¬ì— ì˜¬ë¼ì˜¤ì§€ ì•ŠëŠ”ì§€? -> stat êµ¬ì¡°ì²´ ì´ìš©í•˜ì—¬ íŒŒì¼ ì‚¬ì´ì¦ˆ êµ¬í•´ë³´ê¸°
+	if((fileSize = lseek(fd, 0, SEEK_SET)) < 0) { // lseek¿ ¿¿¿¿ ¿¿ ¿¿¿¿¿¿ ¿¿¿ ¿ ¿¿¿¿¿ ¿¿¿ -> stat ¿¿¿ ¿¿¿ ¿¿ ¿¿¿ ¿¿¿¿
 		fprintf(stderr, "lseek error\n");
 		exit(1);
 	}
