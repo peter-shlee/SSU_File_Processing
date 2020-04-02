@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 
 #define ID_LENGTH 20
 #define NAME_LENGTH 80
@@ -20,5 +21,18 @@ int main(int argc, char *argv[])
 
 	fd = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
-	for(i = 0; i < 2000; ++i) {
+	strcpy(name, "test");
+	for(i = 0; i < 10000; ++i) {
+		name[4] = 0;
+		sprintf(id, "%d", i);
+		strcat(name, id);
+		strcpy(student.id, id);
+		strcpy(student.name, name);
+		printf("id : %s, name : %s\n", student.id, student.name);
+		write(fd, &student, sizeof(student));
+	}
+
+	exit(0);
+}
+		
 		

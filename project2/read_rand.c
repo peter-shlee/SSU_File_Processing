@@ -1,32 +1,94 @@
 #include <stdio.h>
-#include <sys/types.h>
-#include <time.h>
 #include <stdlib.h>
-//ÇÊ¿äÇÏ¸é header file Ãß°¡ °¡´É
+#include <unistd.h>
+#include <fcntl.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+// í•„ìš”í•˜ë©´ header file ì¶”ê°€ ê°€ëŠ¥
 
 
-#define SUFFLE_NUM	10000	// ÀÌ °ªÀº ¸¶À½´ë·Î ¼öÁ¤ÇÒ ¼ö ÀÖÀ½
+#define SUFFLE_NUM 10000 // ì´ ê°’ì€ ë§ˆìŒëŒ€ë¡œ ìˆ˜ì •í•  ìˆ˜ ìˆìŒ
+#define ID_LENGTH 20
+#define NAME_LENGTH 80
+#define STUDENT_RECORD_SIZE (ID_LENGTH + NAME_LENGTH)
 
 void GenRecordSequence(int *list, int n);
 void swap(int *a, int *b);
-// ÇÊ¿äÇÑ ÇÔ¼ö°¡ ÀÖÀ¸¸é ´õ Ãß°¡ÇÒ ¼ö ÀÖÀ½
+// í•„ìš”í•œ í•¨ìˆ˜ê°€ ìˆìœ¼ë©´ ë” ì¶”ê°€í•  ìˆ˜ ìˆìŒ
 
 //
-// argv[1]: ·¹ÄÚµå ÆÄÀÏ¸í
+// argv[1]: 
 //
-int main((int argc, char **argv)
+int main(int argc, char **argv)
 {
+	struct student {
+		char id[ID_LENGTH];
+		char name[NAME_LENGTH];
+	} student;
+	off_t fileSize;
+	int fd;
+	int i;
+	struct timeval begin_t, end_t;
+	suseconds_t runtime;
+	struct stat statbuf;
+
 	int *read_order_list;
 	int num_of_records;
 
-	// ¾Æ·¡ ÇÔ¼ö¸¦ ½ÇÇàÇÏ¸é 'read_order_list' ¹è¿­¿¡ ÃßÈÄ ·£´ıÇÏ°Ô ÀĞ¾î¾ß ÇÒ ·¹ÄÚµå ¹øÈ£µéÀÌ ¼ø¼­´ë·Î ³ª¿­µÇ¾î ÀúÀåµÊ
-            // 'num_of_records'´Â ·¹ÄÚµå ÆÄÀÏ¿¡ ÀúÀåµÇ¾î ÀÖ´Â ÀüÃ¼ ·¹ÄÚµåÀÇ ¼ö¸¦ ÀÇ¹ÌÇÔ
+
+
+	// 'read_order_list'ë¥¼ ì´ìš©í•˜ì—¬ í‘œì¤€ ì…ë ¥ìœ¼ë¡œ ë°›ì€ ë ˆì½”ë“œ íŒŒì¼ë¡œë¶€í„° ë ˆì½”ë“œë¥¼ random í•˜ê²Œ ì½ì–´ë“¤ì´ê³ , 
+            // ì´ë•Œ ê±¸ë¦¬ëŠ” ì‹œê°„ì„ ì¸¡ì •í•˜ëŠ” ì½”ë“œ êµ¬í˜„í•¨
+
+	if(argc != 2) {
+		fprintf(stderr, "usage : %s <file>\n", argv[0]);
+		exit(1);
+	}
+
+
+	if((fd = open(argv[1], O_RDONLY)) < 0) {
+		fprintf(stderr, "open error for %s\n", argv[1]);
+		exit(1);
+	}
+
+//	if((fileSize = lseek(fd, 0, SEEK_END)) < 0) { // lseek ì‚¬ìš©í•˜ë©´ íŒŒì¼ ëê¹Œì§€ ë©”ëª¨ë¦¬ì— ì˜¬ë¼ì˜¤ì§€ ì•ŠëŠ”ì§€? -> stat êµ¬ì¡°ì²´ ì´ìš©í•˜ì—¬ íŒŒì¼ ì‚¬ì´ì¦ˆ êµ¬í•´ë³´ê¸°
+//		fprintf(stderr, "lseek error\n");
+//		exit(1);
+//	}
+	
+	if(fstat(fd, &statbuf) < 0) {
+		fprintf(stderr, "stat error\n");
+		exit(1);
+	}
+	fileSize = statbuf.st_size;
+
+	lseek(fd, 0, SEEK_SET);
+	num_of_records = (int)(fileSize / STUDENT_RECORD_SIZE);
+	read_order_list = (int *)malloc(num_of_records * sizeof(int));
+	// ì•„ë˜ í•¨ìˆ˜ë¥¼ ì‹¤í–‰í•˜ë©´ 'read_order_list' ë°°ì—´ì— ì¶”í›„ ëœë¤í•˜ê²Œ ì½ì–´ì•¼ í•  ë ˆì½”ë“œ ë²ˆí˜¸ë“¤ì´ ìˆœì„œëŒ€ë¡œ ë‚˜ì—´ë˜ì–´ ì €ì¥ë¨
+            // 'num_of_records'ëŠ” ë ˆì½”ë“œ íŒŒì¼ì— ì €ì¥ë˜ì–´ ìˆëŠ” ì „ì²´ ë ˆì½”ë“œì˜ ìˆ˜ë¥¼ ì˜ë¯¸í•¨
 	GenRecordSequence(read_order_list, num_of_records);
 
+	gettimeofday(&begin_t, NULL);
 
-	// 'read_order_list'¸¦ ÀÌ¿ëÇÏ¿© Ç¥ÁØ ÀÔ·ÂÀ¸·Î ¹ŞÀº ·¹ÄÚµå ÆÄÀÏ·ÎºÎÅÍ ·¹ÄÚµå¸¦ random ÇÏ°Ô ÀĞ¾îµéÀÌ°í,
-            // ÀÌ¶§ °É¸®´Â ½Ã°£À» ÃøÁ¤ÇÏ´Â ÄÚµå ±¸ÇöÇÔ
+	for(i = 0; i < num_of_records; ++i) {
+		lseek(fd, read_order_list[i] * sizeof(student), SEEK_SET);
+		if (read(fd, &student, STUDENT_RECORD_SIZE) <= 0)
+			break;
+#ifdef DEBUG
+		printf("id : %s, name : %s\n", student.id, student.name);
+#endif
+	}
 
+	gettimeofday(&end_t, NULL);
+	runtime = end_t.tv_usec - begin_t.tv_usec;
+
+	printf("#records: %d timecost: %ld us\n",num_of_records, runtime);
+
+	free(read_order_list);
+	exit(0);
 
 	return 0;
 }
