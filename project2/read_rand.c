@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 	off_t fileSize;
 	int fd;
 	int i;
-	struct timeval begin_t, end_t;
+	struct timeval begin_t, end_t, interval_t;
 	suseconds_t runtime;
 	struct stat statbuf;
 
@@ -83,7 +83,13 @@ int main(int argc, char **argv)
 	}
 
 	gettimeofday(&end_t, NULL);
-	runtime = end_t.tv_usec - begin_t.tv_usec;
+	interval_t.tv_sec = end_t.tv_sec - begin_t.tv_sec;
+	interval_t.tv_usec = end_t.tv_usec - begin_t.tv_usec;
+	if(interval_t.tv_usec < 0) {
+		interval_t.tv_usec += 1000000;
+		interval_t.tv_sec -= 1;
+	}
+	runtime = interval_t.tv_sec * 1000000 + interval_t.tv_usec;
 
 	printf("#records: %d timecost: %ld us\n",num_of_records, runtime);
 

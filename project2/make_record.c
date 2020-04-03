@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	fd = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
 	strcpy(name, "test");
-	for(i = 0; i < 10000; ++i) {
+	for(i = 0; i < 100000; ++i) {
 		name[4] = 0;
 		sprintf(id, "%d", i);
 		strcat(name, id);
