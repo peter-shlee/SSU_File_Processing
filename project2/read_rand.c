@@ -9,10 +9,8 @@
 // 필요하면 header file 추가 가능
 
 
-#define SUFFLE_NUM 10000 // 이 값은 마음대로 수정할 수 있음
-#define ID_LENGTH 20
-#define NAME_LENGTH 80
-#define STUDENT_RECORD_SIZE (ID_LENGTH + NAME_LENGTH)
+#define SUFFLE_NUM 100000 // 이 값은 마음대로 수정할 수 있음
+#define STUDENT_RECORD_SIZE 100
 
 void GenRecordSequence(int *list, int n);
 void swap(int *a, int *b);
@@ -23,10 +21,7 @@ void swap(int *a, int *b);
 //
 int main(int argc, char **argv)
 {
-	struct student {
-		char id[ID_LENGTH];
-		char name[NAME_LENGTH];
-	} student;
+	char student[STUDENT_RECORD_SIZE];
 	off_t fileSize;
 	int fd;
 	int i;
@@ -74,12 +69,9 @@ int main(int argc, char **argv)
 	gettimeofday(&begin_t, NULL);
 
 	for(i = 0; i < num_of_records; ++i) {
-		lseek(fd, read_order_list[i] * sizeof(student), SEEK_SET);
+		lseek(fd, read_order_list[i] * STUDENT_RECORD_SIZE, SEEK_SET);
 		if (read(fd, &student, STUDENT_RECORD_SIZE) <= 0)
 			break;
-#ifdef DEBUG
-		printf("id : %s, name : %s\n", student.id, student.name);
-#endif
 	}
 
 	gettimeofday(&end_t, NULL);
