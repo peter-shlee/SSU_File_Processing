@@ -5,6 +5,8 @@
 #include "flash.h"
 // 필요한 경우 헤더파일을 추가한다
 
+#define TEMP_FILE_NAME "tmp20160548"
+
 FILE *flashfp;	// fdevicedriver.c에서 사용
 
 int dd_read(int ppn, char *pagebuf);
@@ -140,8 +142,8 @@ void eraseBlock(char *fileName, int blockNumber){
 		return;
 	} 
 
-	if((flashfp = fopen("tmp", "w")) == NULL) {
-		fprintf(stderr, "fopen error for %s\n", "tmp");
+	if((flashfp = fopen(TEMP_FILE_NAME, "w")) == NULL) {
+		fprintf(stderr, "fopen error for %s\n", TEMP_FILE_NAME);
 		return;
 	} 
 
@@ -177,7 +179,7 @@ void eraseBlock(char *fileName, int blockNumber){
 	fclose(flashfp);
 	fclose(tmpfp);
 	unlink(fileName);
-	rename("tmp", fileName);
+	rename(TEMP_FILE_NAME, fileName);
 }
 
 void inplaceUpdate(char *fileName, int pageNumber, char *sectorData, char *spareData){
@@ -192,13 +194,15 @@ void inplaceUpdate(char *fileName, int pageNumber, char *sectorData, char *spare
 	char blockbuf[BLOCK_SIZE];
 	int i, j;
 
+	eraseBlock(fileName, blockNumber);
+
 	if((tmpfp = fopen(fileName, "r")) == NULL) {
 		fprintf(stderr, "fopen error for %s\n", fileName);
 		return;
 	} 
 
-	if((flashfp = fopen("tmp", "w")) == NULL) {
-		fprintf(stderr, "fopen error for %s\n", "tmp");
+	if((flashfp = fopen(TEMP_FILE_NAME, "w")) == NULL) {
+		fprintf(stderr, "fopen error for %s\n", TEMP_FILE_NAME);
 		return;
 	} 
 
@@ -255,5 +259,5 @@ void inplaceUpdate(char *fileName, int pageNumber, char *sectorData, char *spare
 	fclose(flashfp);
 	fclose(tmpfp);
 	unlink(fileName);
-	rename("tmp", fileName);
+	rename(TEMP_FILE_NAME, fileName);
 }
