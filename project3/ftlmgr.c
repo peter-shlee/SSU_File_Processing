@@ -18,6 +18,8 @@ void readPage(char *fileName, int pageNumber);
 void eraseBlock(char *filename, int blockNumber);
 void inplaceUpdate(char *fileName, int pageNumber, char *sectorData, char *spareData);
 int writeBlock(char *fileName, int blockNumber, char *blockbuf);
+int writePage(char *fileName, long numOfBlock, int pageNumber, char *sectorData, char *spareData);
+int isEmptyPage(char *fileName, int pageNumber);
 int isEmptyBlock(char *fileName, int blockNumber);
 int findEmptyBlock(char *fileName, int numOfBlocks);
 void makeNewBlockData(char *fileName, char *blockbuf, int pageNumber, char *sectorData, char *spareData);
@@ -187,6 +189,48 @@ void eraseBlock(char *fileName, int blockNumber){
 	rename(TEMP_FILE_NAME, fileName);
 }
 
+int writePage(char *fileName, long numOfBlocks, int pageNumber, char *sectorData, char *spareData) {
+	FILE *tmpfp;
+	FILE *savefp;
+	char pagebuf[PAGE_SIZE];
+	char *pagebufptr;
+	int tmpPageNum;
+	int i, j;
+
+	if((tmpfp = fopen(fileName, "r")) == NULL) {
+		fprintf(stderr, "fopen error for %s\n", fileName);
+		return 0;
+	} 
+
+	if((flashfp = fopen(TEMP_FILE_NAME, "w")) == NULL) {
+		fprintf(stderr, "fopen error for %s\n", TEMP_FILE_NAME);
+		return 0;
+	} 
+
+	for(i = 0; i < numOfBlocks; ++i) {
+		for(j = 0; j < PAGE_NUM; ++j) {
+			if(i * PAGE_NUM + j == pageNumber) {
+				memset(pagebuf, (char)0xff, PAGE_SIZE);
+				memcpy(pagebuf, sectorData, strlen(sectorData));
+				memcpy(pagebuf + SECTOR_SIZE, spareData, strlen(spareData));
+				dd_write(i * PAGE_NUM + j, pagebuf);
+				continue;
+			}
+			savefp = flashfp;
+			flashfp = tmpfp;
+			dd_read(i * PAGE_NUM + j, pagebuf);
+			flashfp = savefp;
+			fwrite(pagebuf, PAGE_SIZE, 1, flashfp);
+		}
+	}
+
+	fclose(flashfp);
+	fclose(tmpfp);
+	unlink(fileName);
+	rename(TEMP_FILE_NAME, fileName);
+	return 1;
+}
+
 int writeBlock(char *fileName, int blockNumber, char *blockbuf){
 	FILE *tmpfp;
 	FILE *savefp;
@@ -247,6 +291,27 @@ int writeBlock(char *fileName, int blockNumber, char *blockbuf){
 	return 1;
 }
 
+int isEmptyPage(char *fileName, int pageNumber){
+	int j;
+	char pagebuf[PAGE_SIZE];
+
+	if((flashfp = fopen(fileName, "r")) == NULL) {
+		fprintf(stderr, "fopen error for %s\n", fileName);
+		return 0;
+	} 
+
+	dd_read(pageNumber, pagebuf);
+	for(j = 0; (j < PAGE_SIZE); ++j){
+		if(pagebuf[j] != (char)0xff){
+			fclose(flashfp);
+			return 0;
+		}
+	}
+
+	fclose(flashfp);
+	return 1;
+}
+
 int isEmptyBlock(char *fileName, int blockNumber){
 	int k, j;
 	char pagebuf[PAGE_SIZE];
@@ -265,6 +330,7 @@ int isEmptyBlock(char *fileName, int blockNumber){
 		for(j = 0; (j < PAGE_SIZE); ++j){
 			if(pagebuf[j] != (char)0xff){
 				emptyPageFlag = 0;
+				emptyBlockFlag = 0;
 				break;
 			}
 		}
@@ -364,21 +430,20 @@ void inplaceUpdate(char *fileName, int pageNumber, char *sectorData, char *spare
 	numOfBlocks /= BLOCK_SIZE; // 블럭의 총 개수를 구한다
 	fclose(tmpfp);
 	
-	tmpBlockNum = findEmptyBlock(fileName, numOfBlocks); // inplace update에 사용할 empty블락이 있는지 확인한다
-	if(tmpBlockNum == -1){ // empty block이 없다면
-		fprintf(stderr, "no empty block in flash memory\n"); // inplace update가 불가능 하므로 종료한다
-		return;
-	}
-	makeNewBlockData(fileName, blockbuf, pageNumber, sectorData, spareData); // inplace update할 블럭에 있는 기존의 데이터와 새로 write할 데이터를 합쳐 블럭에 들어갈 새로운 데이터를 만들어 blockbuf에 저장해 둔다
-	if(isEmptyBlock(fileName, blockNumber)) { // write할 page가 속한 block이 비어있는 경우
-		// ddwrite 로 수정하기
-		writeBlock(fileName, blockNumber, blockbuf);
-	} else { // write할 page가 속한 block에 데이터가 들어있는 경우
+	if(isEmptyPage(fileName, pageNumber)){
+		writePage(fileName, numOfBlocks, pageNumber, sectorData, spareData); // page만 write
+	} else {// write할 page에 데이터가 들어있는 경우
+		tmpBlockNum = findEmptyBlock(fileName, numOfBlocks); // inplace update에 사용할 empty블락이 있는지 확인한다
+		if(tmpBlockNum == -1){ // empty block이 없다면
+			fprintf(stderr, "no empty block in flash memory\n"); // inplace update가 불가능 하므로 종료한다
+			return;
+		}
+		makeNewBlockData(fileName, blockbuf, pageNumber, sectorData, spareData); // inplace update할 블럭에 있는 기존의 데이터와 새로 write할 데이터를 합쳐 블럭에 들어갈 새로운 데이터를 만들어 blockbuf에 저장해 둔다
 		writeBlock(fileName, tmpBlockNum, blockbuf); // 일단 데이터를 다른 empty 블럭으로 옮겨놓는다
 		eraseBlock(fileName, blockNumber); // 해당 block을 erase한다
 		loadBlockData(fileName, blockbuf, tmpBlockNum); // empty 블럭에 임시 저장했던 데이터를 불러온다
 		writeBlock(fileName, blockNumber, blockbuf); // 위에서 불러온 데이터를 제 위치에 write한다
 		eraseBlock(fileName, tmpBlockNum); // 임시로 사용했던 block에 erase를 하여 다시 empty 블럭으로 만든다
-	}
 
+	}
 }
