@@ -16,13 +16,17 @@
 // file system에 의해 반드시 먼저 호출이 되어야 한다.
 //
 
-#define LBN 0
-#define PBN 1
+#define LSN 0
+#define PSN 1
 #define FLASH_FILE_NAME "20160548_flash_file"
 
 FILE *flashfp;
 int **addressMappingTable;
 int freeBlock;
+
+int dd_read(int ppn, char *pagebuf);
+int dd_write(int ppn, char *pagebuf);
+int dd_erase(int pbn);
 
 void createFlashMemory(char *fileName, int numOfPages);
 
@@ -40,8 +44,8 @@ void ftl_open()
 		addressMappingTable[i] = (int *)malloc(2 * sizeof(int));
 
 	for(i = 0; i < DATAPAGES_PER_DEVICE; ++i) {
-		addressMappingTable[i][LBN] = i;
-		addressMappingTable[i][PBN] = -1;
+		addressMappingTable[i][LSN] = i;
+		addressMappingTable[i][PSN] = -1;
 	}
 
 	printf("mappingtable c\n");
@@ -61,7 +65,22 @@ void ftl_open()
 //
 void ftl_read(int lsn, char *sectorbuf)
 {
+	int i;
+	char pagebuf[PAGE_SIZE];
+
+	if((flashfp = fopen(FLASH_FILE_NAME, "r")) == NULL) {
+		fprintf(stderr, "fopen error for %s\n", FLASH_FILE_NAME);
+		return;
+	} 
 	
+	if(addressMappingTable[lsn][PSN] == -1){
+		memset(sectorbuf, 0, SECTOR_SIZE);
+	       	return; // 이 경우 sector buf를 어떻게 해야 하는가
+	}
+	dd_read(addressMappingTable[lsn][PSN], pagebuf);
+	memcpy(sectorbuf, pagebuf, SECTOR_SIZE);
+
+	fclose(flashfp);
 
 	return;
 }
@@ -79,7 +98,7 @@ void ftl_print()
 
 	printf("lpn\tppn\n");
 	for(i = 0; i < DATAPAGES_PER_DEVICE; ++i) {
-		printf("%d\t%d\n", addressMappingTable[i][LBN], addressMappingTable[i][PBN]);
+		printf("%d\t%d\n", addressMappingTable[i][LSN], addressMappingTable[i][PSN]);
 	}
 	printf("free block's pbn=%d\n", freeBlock);
 
