@@ -119,8 +119,8 @@ void ftl_write(int lsn, char *sectorbuf)
 			int i;
 			int nextWritePage;
 
+			++erasedPageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
 			addressMappingTable[lsn] = -1;
-			++erasedPageCnt[lsn / PAGES_PER_BLOCK];
 
 			// garbage 페이지가 가장 많은 블록을 다음 free블록으로 선정
 			for(i = 0; i < BLOCKS_PER_DEVICE; ++i){
@@ -176,7 +176,7 @@ void ftl_write(int lsn, char *sectorbuf)
 
 			// erase된 페이지들 erasedPageArray 값 1로 변경
 			for(i = 0; i < PAGES_PER_BLOCK; ++i){
-				erasedPageArray[newFreeBlock + i] = 1;
+				erasedPageArray[newFreeBlock * PAGES_PER_BLOCK + i] = 1;
 			}
 			// free블록 값 변경
 			freeBlock = newFreeBlock;
@@ -196,8 +196,8 @@ void ftl_write(int lsn, char *sectorbuf)
 
 				emptyPageAvailableFlag = TRUE;
 				erasedPageArray[i] = 0;
+				++erasedPageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
 				addressMappingTable[lsn] = i;
-				++erasedPageCnt[i / PAGES_PER_BLOCK];
 
 				// 기존 데이터 있던 페이지의 spareData 변경하기
 				
@@ -216,17 +216,21 @@ void ftl_write(int lsn, char *sectorbuf)
 			int i;
 			int nextWritePage;
 
+			++erasedPageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
+			printf("lsn:%d, psn:%d, e:%d\n", lsn, addressMappingTable[lsn], addressMappingTable[lsn] / PAGES_PER_BLOCK);
 			addressMappingTable[lsn] = -1;
-			++erasedPageCnt[lsn / PAGES_PER_BLOCK];
 
 			// garbage 페이지가 가장 많은 블록을 다음 free블록으로 선정
 			for(i = 0; i < BLOCKS_PER_DEVICE; ++i){
+				printf("%d:%d, ", i, erasedPageCnt[i]);
 				if(erasedPageCnt[i] > maxGarbageCnt) {
 					maxGarbageCnt = erasedPageCnt[i];
 					newFreeBlock = i;
 				}
 			}
+			printf("\n");
 
+			printf("newFreeBlock : %d\n", newFreeBlock);
 			nextWritePage = freeBlock * PAGES_PER_BLOCK;
 
 			// 기존 데이터 중 아직 유효한 페이지를 기존의 free 블럭으로 옮김 - 유효한 페이지는 "addressMapping 테이블에서 찾을 수 있는가"로 확인
@@ -272,8 +276,9 @@ void ftl_write(int lsn, char *sectorbuf)
 			erasedPageCnt[newFreeBlock] = 0;
 
 			// erase된 페이지들 erasedPageArray 값 1로 변경
-			for(i = 0; i < PAGES_PER_BLOCK; ++i)
-				erasedPageArray[newFreeBlock + i] = 1;
+			for(i = 0; i < PAGES_PER_BLOCK; ++i){
+				erasedPageArray[newFreeBlock * PAGES_PER_BLOCK + i] = 1;
+			}
 			// free블록 값 변경
 			freeBlock = newFreeBlock;
 
@@ -282,6 +287,11 @@ void ftl_write(int lsn, char *sectorbuf)
 
 
 	}
+
+	for(i = 0; i < BLOCKS_PER_DEVICE * PAGES_PER_BLOCK; ++i) {
+		printf("%d:%d, ", i, erasedPageArray[i]);
+	}
+	printf("\n");
 
 	return;
 }
