@@ -32,6 +32,7 @@ int dd_erase(int pbn);
 
 void createFlashMemory(char *fileName, int numOfPages);
 int writePage(char *fileName, long numOfBlocks, int pageNumber, char *sectorData, char *spareData);
+void eraseBlock(char *fileName, int blockNumber);
 
 void ftl_open()
 {
@@ -89,6 +90,10 @@ void ftl_write(int lsn, char *sectorbuf)
 {
 	int psn;
 	int i, j;
+	SpareData spareData;
+	spareData.lpn = lsn;
+	spareData.is_invalid = TRUE;
+
 	if(addressMappingTable[lsn] == -1) {
 		int emptyPageAvailableFlag = FALSE;
 		for(i = 0; i < PAGES_PER_BLOCK * BLOCKS_PER_DEVICE; ++i) {
@@ -96,10 +101,6 @@ void ftl_write(int lsn, char *sectorbuf)
 			if (i / PAGES_PER_BLOCK == freeBlock) continue;
 
 			if(erasedPageArray[i]) { // 데이터가 저장되어 있지 않은 페이지라면
-				SpareData spareData;
-				spareData.lpn = lsn;
-				spareData.is_invalid = TRUE;
-
 				emptyPageAvailableFlag = TRUE;
 				erasedPageArray[i] = 0;
 				addressMappingTable[lsn] = i;
@@ -118,11 +119,11 @@ void ftl_write(int lsn, char *sectorbuf)
 			int i;
 			int nextWritePage;
 
-			addressMappingTable = -1;
+			addressMappingTable[lsn] = -1;
 			++erasedPageCnt[lsn / PAGES_PER_BLOCK];
 
 			// garbage 페이지가 가장 많은 블록을 다음 free블록으로 선정
-			for(i = 0; i < BLOCKS_PER_DEVICE ++i){
+			for(i = 0; i < BLOCKS_PER_DEVICE; ++i){
 				if(erasedPageCnt[i] > maxGarbageCnt) {
 					maxGarbageCnt = erasedPageCnt[i];
 					newFreeBlock = i;
@@ -142,12 +143,23 @@ void ftl_write(int lsn, char *sectorbuf)
 				}
 
 				if(validPageFlag) {
-					char *tmpPageData[];
-					// addressMappingTable값 변경
+					char pagebuf[PAGE_SIZE];
 
 					// 기존 값 불러온 뒤 새로운 페이지에 저장
-					writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage++, , (char *));
+					if((flashfp = fopen(FLASH_FILE_NAME, "r")) == NULL) {
+						fprintf(stderr, "fopen error for %s\n", FLASH_FILE_NAME);
+						return;
+					} 
+					
+					dd_read(addressMappingTable[j], pagebuf);
 
+					fclose(flashfp);
+
+					writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage, pagebuf, pagebuf + SECTOR_SIZE);
+
+					// addressMappingTable값 변경
+					erasedPageArray[nextWritePage] = 0;
+					addressMappingTable[j] = nextWritePage++;
 				}
 				
 
@@ -155,13 +167,17 @@ void ftl_write(int lsn, char *sectorbuf)
 			// 새로운 데이터 write
 			writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage, sectorbuf, (char *)&spareData);
 			// addressMappingTable값 변경
+			erasedPageArray[nextWritePage] = 0;
 			addressMappingTable[lsn] = nextWritePage;
 
 			// 기존 블럭 erase
+			eraseBlock(FLASH_FILE_NAME, newFreeBlock);
+			erasedPageCnt[newFreeBlock] = 0;
 
 			// erase된 페이지들 erasedPageArray 값 1로 변경
-			for(i = 0; i < PAGES_PER_BLOCK; ++i)
+			for(i = 0; i < PAGES_PER_BLOCK; ++i){
 				erasedPageArray[newFreeBlock + i] = 1;
+			}
 			// free블록 값 변경
 			freeBlock = newFreeBlock;
 
@@ -195,6 +211,72 @@ void ftl_write(int lsn, char *sectorbuf)
 
 		if(!emptyPageAvailableFlag) { // 비어있는 페이지가 없다면
 			// free블럭 활용
+			int newFreeBlock = 0;
+			int maxGarbageCnt = 0;
+			int i;
+			int nextWritePage;
+
+			addressMappingTable[lsn] = -1;
+			++erasedPageCnt[lsn / PAGES_PER_BLOCK];
+
+			// garbage 페이지가 가장 많은 블록을 다음 free블록으로 선정
+			for(i = 0; i < BLOCKS_PER_DEVICE; ++i){
+				if(erasedPageCnt[i] > maxGarbageCnt) {
+					maxGarbageCnt = erasedPageCnt[i];
+					newFreeBlock = i;
+				}
+			}
+
+			nextWritePage = freeBlock * PAGES_PER_BLOCK;
+
+			// 기존 데이터 중 아직 유효한 페이지를 기존의 free 블럭으로 옮김 - 유효한 페이지는 "addressMapping 테이블에서 찾을 수 있는가"로 확인
+			for(i = 0; i < PAGES_PER_BLOCK; ++i) {
+				int validPageFlag = FALSE;
+				for(j = 0; j < DATAPAGES_PER_DEVICE; ++j) {
+					if(addressMappingTable[j] == newFreeBlock * PAGES_PER_BLOCK + i) {
+						validPageFlag = TRUE;
+						break;
+					}
+				}
+
+				if(validPageFlag) {
+					char pagebuf[PAGE_SIZE];
+
+					// 기존 값 불러온 뒤 새로운 페이지에 저장
+					if((flashfp = fopen(FLASH_FILE_NAME, "r")) == NULL) {
+						fprintf(stderr, "fopen error for %s\n", FLASH_FILE_NAME);
+						return;
+					} 
+					
+					dd_read(addressMappingTable[j], pagebuf);
+
+					fclose(flashfp);
+
+					writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage, pagebuf, pagebuf + SECTOR_SIZE);
+
+					// addressMappingTable값 변경
+					erasedPageArray[nextWritePage] = 0;
+					addressMappingTable[j] = nextWritePage++;
+				}
+				
+
+			}
+			// 새로운 데이터 write
+			writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage, sectorbuf, (char *)&spareData);
+			// addressMappingTable값 변경
+			erasedPageArray[nextWritePage] = 0;
+			addressMappingTable[lsn] = nextWritePage;
+
+			// 기존 블럭 erase
+			eraseBlock(FLASH_FILE_NAME, newFreeBlock);
+			erasedPageCnt[newFreeBlock] = 0;
+
+			// erase된 페이지들 erasedPageArray 값 1로 변경
+			for(i = 0; i < PAGES_PER_BLOCK; ++i)
+				erasedPageArray[newFreeBlock + i] = 1;
+			// free블록 값 변경
+			freeBlock = newFreeBlock;
+
 
 		}
 
@@ -244,6 +326,60 @@ int writePage(char *fileName, long numOfBlocks, int pageNumber, char *sectorData
 	unlink(fileName);
 	rename(TEMP_FILE_NAME, fileName);
 	return 1;
+}
+
+void eraseBlock(char *fileName, int blockNumber){ // 블록을 erase 하는 함수
+	FILE *tmpfp;
+	FILE *savefp;
+	long numOfBlocks;
+	char pagebuf[PAGE_SIZE];
+	int i, j;
+
+	if((tmpfp = fopen(fileName, "r")) == NULL) { // 기존의 flashfile open
+		fprintf(stderr, "fopen error for %s\n", fileName);
+		return;
+	} 
+
+	if((flashfp = fopen(TEMP_FILE_NAME, "w")) == NULL) { // 새로운 flashfile open
+		fprintf(stderr, "fopen error for %s\n", TEMP_FILE_NAME);
+		return;
+	} 
+
+	if(fseek(tmpfp, 0, SEEK_END) != 0){
+		fprintf(stderr, "fseek error\n");
+		return;
+	}
+
+	if((numOfBlocks = ftell(tmpfp)) < 0) {
+		fprintf(stderr, "ftell error\n");
+		return;
+	}
+
+	numOfBlocks /= BLOCK_SIZE; // flash memory의 블록의 총 개수를 구한다
+
+	fseek(tmpfp, 0, SEEK_SET);
+
+	for(i = 0; i < numOfBlocks; ++i) {
+		if(i == blockNumber) { // erase할 블록이라면
+			dd_erase(blockNumber);
+			continue;
+		}
+
+		for(j = 0; j < PAGES_PER_BLOCK; ++j) { // erase 하지 않을 블록이라면 그냥 기존 파일의 내용을 새 파일에 복사한다
+			savefp = flashfp;
+			flashfp = tmpfp;
+			dd_read(i * PAGES_PER_BLOCK + j, pagebuf);
+			flashfp = savefp;
+			fwrite(pagebuf, PAGE_SIZE, 1, flashfp);	// 실제 flash memory가 아니라 파일에 대해서 작업을 하고 있기 때문에 내용을 수정하려면 새로운 파일을 만들어 swap해야 한다
+								// 이 과정에서 실제 flash memory라면 아무 작업도 하지 않아도 될 블럭들도 새로운 파일로 복사해야한다
+								// 이런 데이터는 fdevicedriver의 함수를 사용하지 않고 fwrite()를 사용했다
+		}
+	}
+
+	fclose(flashfp);
+	fclose(tmpfp);
+	unlink(fileName);
+	rename(TEMP_FILE_NAME, fileName);
 }
 
 void ftl_print()

@@ -12,22 +12,79 @@ int main(){
 	ftl_open();
 	ftl_print();
 	
-	sprintf(sectorData, "Hello world!! ");
+	sprintf(sectorData, "0");
+	ftl_write(0, sectorData);
+
+	sprintf(sectorData, "1");
+	ftl_write(1, sectorData);
+
+	ftl_print();
+
+	sprintf(sectorData, "2");
+	ftl_write(2, sectorData);
+
+	ftl_print();
+
+	sprintf(sectorData, "3");
 	ftl_write(3, sectorData);
 
+	ftl_print();
+
+	sprintf(sectorData, "4");
+	ftl_write(4, sectorData);
+
+	ftl_print();
+
+	sprintf(sectorData, "5");
+	ftl_write(5, sectorData);
+
+	ftl_print();
+
+	sprintf(sectorData, "6");
+	ftl_write(6, sectorData);
+
+	ftl_print();
+
+	sprintf(sectorData, "7");
+	ftl_write(7, sectorData);
+
+	ftl_print();
+
+	sprintf(sectorData, "new 0");
+	ftl_write(0, sectorData);
+
+	ftl_print();
+
+	sprintf(sectorData, "new 4");
+	ftl_write(4, sectorData);
+
+	ftl_print();
+	
+	sprintf(sectorData, "new 2");
+	ftl_write(2, sectorData);
+
+	ftl_print();
+	memset(sectorData, 0, 512);
+	ftl_read(1, sectorData);
+	printf("1: %s\n", sectorData);
+	memset(sectorData, 0, 512);
+	ftl_read(2, sectorData);
+	printf("2: %s\n", sectorData);
 	memset(sectorData, 0, 512);
 	ftl_read(3, sectorData);
-
-	sprintf(sectorData, "write test");
-	ftl_write(30, sectorData);
-
-	sprintf(sectorData, "20160548 Lee Seung Hyun");
-	ftl_write(43, sectorData);
-
-	
-
-	printf("%s\n", sectorData);
-	ftl_print();
+	printf("3: %s\n", sectorData);
+	memset(sectorData, 0, 512);
+	ftl_read(4, sectorData);
+	printf("4: %s\n", sectorData);
+	memset(sectorData, 0, 512);
+	ftl_read(5, sectorData);
+	printf("5: %s\n", sectorData);
+	memset(sectorData, 0, 512);
+	ftl_read(6, sectorData);
+	printf("6: %s\n", sectorData);
+	memset(sectorData, 0, 512);
+	ftl_read(7, sectorData);
+	printf("7: %s\n", sectorData);
 
 	return 0;
 }
