@@ -6,77 +6,82 @@ void ftl_read(int lsn, char *sectorbuf);
 void ftl_write(int lsn, char *sectorbuf);
 
 int main(){
-	printf("start\n");
 	char sectorData[512];
 
 	ftl_open();
-	ftl_print();
+	//ftl_print();
 	
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "0");
 	ftl_write(0, sectorData);
 
-	ftl_print();
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "1");
 	ftl_write(1, sectorData);
 
-	ftl_print();
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "2");
 	ftl_write(2, sectorData);
 
-	ftl_print();
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "3");
 	ftl_write(3, sectorData);
 
-	ftl_print();
+	//ftl_print();
+
+	memset(sectorData, 0, 512);
+	sprintf(sectorData, "new 3");
+	ftl_write(3, sectorData);
+
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "4");
 	ftl_write(4, sectorData);
 
-	ftl_print();
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "5");
 	ftl_write(5, sectorData);
 
-	ftl_print();
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "6");
 	ftl_write(6, sectorData);
 
-	ftl_print();
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "7");
 	ftl_write(7, sectorData);
 
-	ftl_print();
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "new 0");
 	ftl_write(0, sectorData);
 
-	ftl_print();
+	//ftl_print();
 
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "new 4");
 	ftl_write(4, sectorData);
 
-	ftl_print();
+	//ftl_print();
 	
 	memset(sectorData, 0, 512);
 	sprintf(sectorData, "new 2");
 	ftl_write(2, sectorData);
 
-	ftl_print();
+	//ftl_print();
 	memset(sectorData, 0, 512);
 	ftl_read(0, sectorData);
 	printf("0: %s\n", sectorData);

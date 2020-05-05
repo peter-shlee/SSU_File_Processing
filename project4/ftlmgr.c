@@ -20,39 +20,39 @@
 #define FLASH_FILE_NAME "20160548_flash_file"
 #define TEMP_FILE_NAME "20160548_temp_file"
 
-FILE *flashfp;
-int *addressMappingTable;
-int *erasedPageCnt;
-int *erasedPageArray;
-int freeBlock;
+FILE *flashfp; // fdevicedriver.c에서 사용하는 파일 포인터
+int *addressMappingTable; // sector mapping 방식의 address mapping table
+int *garbagePageCnt; // 블럭별 garbage 페이지 개수 배열
+int *erasedPageArray; // 내용 삭제되어 바로 write할 수 있는 페이지 배열
+int freeBlock; // freeBlock 인덱스
 
-int dd_read(int ppn, char *pagebuf);
-int dd_write(int ppn, char *pagebuf);
-int dd_erase(int pbn);
+int dd_read(int ppn, char *pagebuf); // fdevicedriver.c의 함수
+int dd_write(int ppn, char *pagebuf); // fdevicedriver.c의 함수
+int dd_erase(int pbn); // fdevicedriver.c의 함수
 
-void createFlashMemory(char *fileName, int numOfPages);
-int writePage(char *fileName, long numOfBlocks, int pageNumber, char *sectorData, char *spareData);
-void eraseBlock(char *fileName, int blockNumber);
+void createFlashMemory(char *fileName, int numOfPages); // 플래시 메모리 파일 생성하는 함수
+int writePage(char *fileName, long numOfBlocks, int pageNumber, char *sectorData, char *spareData); // page단위로 write하는 함수
+void eraseBlock(char *fileName, int blockNumber); // 해당 블럭을 erase하는 함수
 
 void ftl_open()
 {
-	//
-	// address mapping table 초기화
-	// free block's pbn 초기화
-    	// address mapping table에서 lbn 수는 DATABLKS_PER_DEVICE 동일
 	int i;
 
+	// address mapping table 초기화
+    	// address mapping table에서 lbn 수는 DATABLKS_PER_DEVICE 동일
 	addressMappingTable = (int *)malloc(DATAPAGES_PER_DEVICE * sizeof(int));
 	for(i = 0; i < DATAPAGES_PER_DEVICE; ++i) 
 		addressMappingTable[i] = -1;
 
-	erasedPageCnt = (int *)calloc(BLOCKS_PER_DEVICE ,sizeof(int));
+	// file I/O에 사용할 여러 배열들 생성
+	garbagePageCnt = (int *)calloc(BLOCKS_PER_DEVICE ,sizeof(int));
 	erasedPageArray = (int *)malloc(BLOCKS_PER_DEVICE * PAGES_PER_BLOCK * sizeof(int));
 	for(i = 0; i < BLOCKS_PER_DEVICE * PAGES_PER_BLOCK; ++i)
-		erasedPageArray[i] = 1;
+		erasedPageArray[i] = TRUE;
 
 	createFlashMemory(FLASH_FILE_NAME, BLOCKS_PER_DEVICE * PAGES_PER_BLOCK);
 	
+	// free block's pbn 초기화
 	freeBlock = DATABLKS_PER_DEVICE;
 
 
@@ -94,7 +94,7 @@ void ftl_write(int lsn, char *sectorbuf)
 	spareData.lpn = lsn;
 	spareData.is_invalid = TRUE;
 
-	if(addressMappingTable[lsn] == -1) {
+	if(addressMappingTable[lsn] == -1) { // 해당 lsn이 아직 한번도 쓰여진 적이 없는 경우
 		int emptyPageAvailableFlag = FALSE;
 		for(i = 0; i < PAGES_PER_BLOCK * BLOCKS_PER_DEVICE; ++i) {
 			// free 블럭의 페이지인지 확인
@@ -102,7 +102,7 @@ void ftl_write(int lsn, char *sectorbuf)
 
 			if(erasedPageArray[i]) { // 데이터가 저장되어 있지 않은 페이지라면
 				emptyPageAvailableFlag = TRUE;
-				erasedPageArray[i] = 0;
+				erasedPageArray[i] = FALSE;
 				addressMappingTable[lsn] = i;
 
 				writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, i, sectorbuf, (char *)&spareData);
@@ -119,13 +119,13 @@ void ftl_write(int lsn, char *sectorbuf)
 			int i;
 			int nextWritePage;
 
-			++erasedPageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
+			++garbagePageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
 			addressMappingTable[lsn] = -1;
 
 			// garbage 페이지가 가장 많은 블록을 다음 free블록으로 선정
 			for(i = 0; i < BLOCKS_PER_DEVICE; ++i){
-				if(erasedPageCnt[i] > maxGarbageCnt) {
-					maxGarbageCnt = erasedPageCnt[i];
+				if(garbagePageCnt[i] > maxGarbageCnt) {
+					maxGarbageCnt = garbagePageCnt[i];
 					newFreeBlock = i;
 				}
 			}
@@ -158,7 +158,7 @@ void ftl_write(int lsn, char *sectorbuf)
 					writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage, pagebuf, pagebuf + SECTOR_SIZE);
 
 					// addressMappingTable값 변경
-					erasedPageArray[nextWritePage] = 0;
+					erasedPageArray[nextWritePage] = FALSE;
 					addressMappingTable[j] = nextWritePage++;
 				}
 				
@@ -167,23 +167,21 @@ void ftl_write(int lsn, char *sectorbuf)
 			// 새로운 데이터 write
 			writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage, sectorbuf, (char *)&spareData);
 			// addressMappingTable값 변경
-			erasedPageArray[nextWritePage] = 0;
+			erasedPageArray[nextWritePage] = FALSE;
 			addressMappingTable[lsn] = nextWritePage;
 
 			// 기존 블럭 erase
 			eraseBlock(FLASH_FILE_NAME, newFreeBlock);
-			erasedPageCnt[newFreeBlock] = 0;
+			garbagePageCnt[newFreeBlock] = 0;
 
 			// erase된 페이지들 erasedPageArray 값 1로 변경
 			for(i = 0; i < PAGES_PER_BLOCK; ++i){
-				erasedPageArray[newFreeBlock * PAGES_PER_BLOCK + i] = 1;
+				erasedPageArray[newFreeBlock * PAGES_PER_BLOCK + i] = TRUE;
 			}
 			// free블록 값 변경
 			freeBlock = newFreeBlock;
-
 		}
-
-	} else { // 
+	} else { // 해당 lsn이 이미 쓰여있는 경우
 		int emptyPageAvailableFlag = FALSE;
 		for(i = 0; i < PAGES_PER_BLOCK * BLOCKS_PER_DEVICE; ++i) {
 			// free 블럭의 페이지인지 확인
@@ -195,20 +193,14 @@ void ftl_write(int lsn, char *sectorbuf)
 				spareData.is_invalid = TRUE;
 
 				emptyPageAvailableFlag = TRUE;
-				erasedPageArray[i] = 0;
-				++erasedPageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
+				erasedPageArray[i] = FALSE;
+				++garbagePageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
 				addressMappingTable[lsn] = i;
-
-				// 기존 데이터 있던 페이지의 spareData 변경하기
-				
 
 				writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, i, sectorbuf, (char *)&spareData);
 				break;
 			}
-
-
 		}
-
 		if(!emptyPageAvailableFlag) { // 비어있는 페이지가 없다면
 			// free블럭 활용
 			int newFreeBlock = 0;
@@ -216,21 +208,21 @@ void ftl_write(int lsn, char *sectorbuf)
 			int i;
 			int nextWritePage;
 
-			++erasedPageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
-			printf("lsn:%d, psn:%d, e:%d\n", lsn, addressMappingTable[lsn], addressMappingTable[lsn] / PAGES_PER_BLOCK);
+			++garbagePageCnt[addressMappingTable[lsn] / PAGES_PER_BLOCK];
+//			printf("lsn:%d, psn:%d, e:%d\n", lsn, addressMappingTable[lsn], addressMappingTable[lsn] / PAGES_PER_BLOCK);
 			addressMappingTable[lsn] = -1;
 
 			// garbage 페이지가 가장 많은 블록을 다음 free블록으로 선정
 			for(i = 0; i < BLOCKS_PER_DEVICE; ++i){
-				printf("%d:%d, ", i, erasedPageCnt[i]);
-				if(erasedPageCnt[i] > maxGarbageCnt) {
-					maxGarbageCnt = erasedPageCnt[i];
+//				printf("%d:%d, ", i, garbagePageCnt[i]);
+				if(garbagePageCnt[i] > maxGarbageCnt) {
+					maxGarbageCnt = garbagePageCnt[i];
 					newFreeBlock = i;
 				}
 			}
-			printf("\n");
+//			printf("\n");
 
-			printf("newFreeBlock : %d\n", newFreeBlock);
+//			printf("newFreeBlock : %d\n", newFreeBlock);
 			nextWritePage = freeBlock * PAGES_PER_BLOCK;
 
 			// 기존 데이터 중 아직 유효한 페이지를 기존의 free 블럭으로 옮김 - 유효한 페이지는 "addressMapping 테이블에서 찾을 수 있는가"로 확인
@@ -259,7 +251,7 @@ void ftl_write(int lsn, char *sectorbuf)
 					writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage, pagebuf, pagebuf + SECTOR_SIZE);
 
 					// addressMappingTable값 변경
-					erasedPageArray[nextWritePage] = 0;
+					erasedPageArray[nextWritePage] = FALSE;
 					addressMappingTable[j] = nextWritePage++;
 				}
 				
@@ -268,30 +260,28 @@ void ftl_write(int lsn, char *sectorbuf)
 			// 새로운 데이터 write
 			writePage(FLASH_FILE_NAME, BLOCKS_PER_DEVICE, nextWritePage, sectorbuf, (char *)&spareData);
 			// addressMappingTable값 변경
-			erasedPageArray[nextWritePage] = 0;
+			erasedPageArray[nextWritePage] = FALSE;
 			addressMappingTable[lsn] = nextWritePage;
 
 			// 기존 블럭 erase
 			eraseBlock(FLASH_FILE_NAME, newFreeBlock);
-			erasedPageCnt[newFreeBlock] = 0;
+			garbagePageCnt[newFreeBlock] = 0;
 
 			// erase된 페이지들 erasedPageArray 값 1로 변경
 			for(i = 0; i < PAGES_PER_BLOCK; ++i){
-				erasedPageArray[newFreeBlock * PAGES_PER_BLOCK + i] = 1;
+				erasedPageArray[newFreeBlock * PAGES_PER_BLOCK + i] = TRUE;
 			}
 			// free블록 값 변경
 			freeBlock = newFreeBlock;
-
-
 		}
 
 
 	}
 
-	for(i = 0; i < BLOCKS_PER_DEVICE * PAGES_PER_BLOCK; ++i) {
-		printf("%d:%d, ", i, erasedPageArray[i]);
-	}
-	printf("\n");
+//	for(i = 0; i < BLOCKS_PER_DEVICE * PAGES_PER_BLOCK; ++i) {
+//		printf("%d:%d, ", i, erasedPageArray[i]);
+//	}
+//	printf("\n");
 
 	return;
 }
