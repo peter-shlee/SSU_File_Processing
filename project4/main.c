@@ -13,7 +13,7 @@ int main(){
 	char sectorData[512];
 
 
-	//unlink("20160548_flash_file");
+	unlink("20160548_flash_file");
 	fclose(fopen("20160548_flash_file", "w"));
 	createFlashMemory("20160548_flash_file", BLOCKS_PER_DEVICE);
 
