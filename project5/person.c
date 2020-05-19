@@ -81,6 +81,10 @@ void insert(FILE *fp, const Person *p)
 	int headerbuf[PAGE_SIZE / sizeof(int)];
 	int recordsPerPage = PAGE_SIZE / RECORD_SIZE;
 	long fsize;
+	memset(pagebuf, 0xffff, PAGE_SIZE);
+	memset(headerbuf, 0xffff, PAGE_SIZE);
+	memset(recordbuf, 0xffff, RECORD_SIZE);
+
 	if (fseek(fp, 0, SEEK_END) < 0) { // 파일의 오프셋을 파일의 맨 끝으로 이동
 		fprintf(stderr, "fseek error, %s\n", strerror(errno));
 		return;
