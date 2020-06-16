@@ -4,7 +4,7 @@
 #include "person.h"
 //필요한 경우 헤더 파일과 함수를 추가할 수 있음
 
-#define MAX_RECORD_COUNT 256
+#define MAX_RECORD_COUNT 512
 
 char **heaparray;
 int heap_element_count = 0;
@@ -28,8 +28,8 @@ void makeSortedFile(FILE *outputfp, char **heaparray);
 //
 void readPage(FILE *fp, char *pagebuf, int pagenum)
 {
-	fseek(fp, pagenum * PAGE_SIZE, SEEK_SET);
-	fread(pagebuf, PAGE_SIZE, 1, fp);
+	fseek(fp, pagenum * PAGE_SIZE, SEEK_SET); // read할 페이지 위치로 오프셋 이동
+	fread(pagebuf, PAGE_SIZE, 1, fp); // 페이지를 read
 
 	return;
 }
@@ -39,8 +39,8 @@ void readPage(FILE *fp, char *pagebuf, int pagenum)
 //
 void writePage(FILE *fp, const char *pagebuf, int pagenum)
 {
-	fseek(fp, pagenum * PAGE_SIZE, SEEK_SET);
-	fwrite(pagebuf, PAGE_SIZE, 1, fp);
+	fseek(fp, pagenum * PAGE_SIZE, SEEK_SET); // write 할 페이지 위치로 오프셋 이동
+	fwrite(pagebuf, PAGE_SIZE, 1, fp); // 페이지를 write
 
 	return;
 }
@@ -58,18 +58,18 @@ void buildHeap(FILE *inputfp, char **heaparray)
 	int added_record_count;
 	int record_file_info[2];
 
-	readPage(inputfp, pagebuf, 0);
-	memcpy(record_file_info, pagebuf, sizeof(record_file_info));
-	page_count = record_file_info[0];
-	record_count = record_file_info[1];
+	readPage(inputfp, pagebuf, 0); // 헤더 페이지 읽어옴
+	memcpy(record_file_info, pagebuf, sizeof(record_file_info)); // 헤더페이지에서 페이지, 레코드 개수 저장된 부분 복사
+	page_count = record_file_info[0]; // 페이지 개수 저장
+	record_count = record_file_info[1]; // 레코드 개수 저장
 
 	added_record_count = 0;
 	for (i = 1; i < page_count; ++i) {
-		readPage(inputfp, pagebuf, i);
+		readPage(inputfp, pagebuf, i); // 페이지 차례대로 읽는다
 
-		for (j = 0; j < PAGE_SIZE / RECORD_SIZE; ++j) {
-			if (added_record_count >= record_count) break;
-			addToHeap(pagebuf + (j * RECORD_SIZE), heaparray);
+		for (j = 0; j < PAGE_SIZE / RECORD_SIZE; ++j) { // 페이지에 저장할 수 있는 레코드 개수만큼 반복
+			if (added_record_count >= record_count) break; // 추가한 레코드 개수가 총 레코드 개수와 같다면 더이상 확인할 레코드가 남아있지 않으므로 반복 종료
+			addToHeap(pagebuf + (j * RECORD_SIZE), heaparray); // 해당 레코드를 heap에 추가
 			++added_record_count;
 		}
 	}
@@ -83,19 +83,21 @@ void addToHeap(const char *record, char **heaparray){
 	int i;
 	int parent_index;
 
-	memcpy(record_buffer, record, RECORD_SIZE);
-	sn = strtok(record_buffer, "#");
-	strcpy(person1.sn, sn);
+	memcpy(record_buffer, record, RECORD_SIZE); // 원본 record가 수정되지 않도록 복사한 record를 생성해 복사본을 이용한다
+	sn = strtok(record_buffer, "#"); // record 맨 앞에 있는 주민번호를 구한다
+	strcpy(person1.sn, sn); // 위에서 얻은 주민번호를 따로 저장한다
 
-	memcpy(heaparray[heap_element_count], record, RECORD_SIZE);
+	heaparray[heap_element_count] = (char *) malloc(RECORD_SIZE); // heap sort에 이용할 배열에 새 record를 저장할 공간을 할당받는다
+	memcpy(heaparray[heap_element_count], record, RECORD_SIZE); // 새로 할당된 공간에 record를 새로 추가한다
 
 	for (i = heap_element_count; i > 0; i = parent_index) {
-		parent_index = (i - 1) / 2;
-		memcpy(record_buffer, heaparray[parent_index], RECORD_SIZE);
-		sn = strtok(record_buffer, "#");
-		strcpy(person2.sn, sn);
+		parent_index = (i - 1) / 2; // 부모 노드의 인덱스를 구한다
+		memcpy(record_buffer, heaparray[parent_index], RECORD_SIZE); // 부모 record가 수정되지 않도록 record_buffer에 복사한 뒤 복사본을 이용
+		sn = strtok(record_buffer, "#"); // record 맨 앞에 있는 주민번호를 구한다
+		strcpy(person2.sn, sn); // 위에서 얻은 주민번호를 따로 저장한다
 
-		if (strcmp(person1.sn, person2.sn) < 0) {
+		if (strcmp(person1.sn, person2.sn) < 0) { // 부모 record의 주민번호 > 추가한 record의 주민번호 이면
+			//swap
 			memcpy(record_buffer, heaparray[i], RECORD_SIZE);
 			memcpy(heaparray[i], heaparray[parent_index], RECORD_SIZE);
 			memcpy(heaparray[parent_index], record_buffer, RECORD_SIZE);
@@ -123,25 +125,25 @@ void makeSortedFile(FILE *outputfp, char **heaparray)
 	int record_file_info[2];
 
 	memset(pagebuf, 0xff, PAGE_SIZE);
-	record_count = heap_element_count;
-	page_count = ((record_count + 1) / (PAGE_SIZE / RECORD_SIZE)) + 1;
-	record_file_info[0] = page_count;
+	record_count = heap_element_count; // 레코드 개수 저장
+	page_count = ((record_count + 1) / (PAGE_SIZE / RECORD_SIZE)) + 1; // 페이지 개수 저장
+	record_file_info[0] = page_count; // 헤더 페이지에 저장할 데이터 만든다
 	record_file_info[1] = record_count;
 	memcpy(pagebuf, record_file_info, sizeof(record_file_info));
-	writePage(outputfp, pagebuf, 0);
+	writePage(outputfp, pagebuf, 0); // 헤더 페이지 write
 
 	writed_record_count = 0;
 	for (i = 1; i < page_count; ++i) {
 		memset(pagebuf, 0xff, PAGE_SIZE);
 
 		for (j = 0; j < PAGE_SIZE / RECORD_SIZE; ++j) {
-			if (writed_record_count >= heap_element_count) {
-				break;
+			if (writed_record_count >= heap_element_count) { // 모든 레코드를 기록했다면
+				break; // 반복 종료
 			}
-			memcpy(pagebuf + (j * RECORD_SIZE), heaparray[(i - 1) * (PAGE_SIZE / RECORD_SIZE) + j], RECORD_SIZE);
+			memcpy(pagebuf + (j * RECORD_SIZE), heaparray[(i - 1) * (PAGE_SIZE / RECORD_SIZE) + j], RECORD_SIZE); // 페이지 버퍼에 레코드 추가
 			++writed_record_count;
 		}
-		writePage(outputfp, pagebuf, i);
+		writePage(outputfp, pagebuf, i); // 페이지 write
 	}
 
 	return;
@@ -153,35 +155,34 @@ int main(int argc, char *argv[])
 	FILE *outputfp;	// 정렬된 레코드 파일의 파일 포인터
 	int i;
 
-	heaparray = (char **) malloc(sizeof(char *) * MAX_RECORD_COUNT);
-	for(i = 0; i < MAX_RECORD_COUNT; ++i) {
-		heaparray[i] = (char *) malloc(RECORD_SIZE);
-	}
-
-	if (argc != 4) {
+	if (argc != 4) { // 프로그램 실행 시 전달된 인자의 개수가 잘못됐다면 사용법 출력 후 종료
 		fprintf(stderr, "usage : %s s <input record file name> <output record file name>\n", argv[0]);
 		exit(1);
 	}
 
-	if (strcmp("s", argv[1]) && strcmp("S", argv[1])) {
+	if (strcmp("s", argv[1]) && strcmp("S", argv[1])) { // 프로그램 실행 시 전달된 옵션이 잘못되었다면 사용법 출력 후 종료
 		fprintf(stderr, "usage : %s s <input record file name> <output record file name>\n", argv[0]);
 		exit(1);
 	}
 
-	if ((inputfp = fopen(argv[2], "r")) == NULL) {
+	if ((inputfp = fopen(argv[2], "r")) == NULL) { // input record file이 open되지 않는다면 종료
 		fprintf(stderr, "fopen error for %s\n", argv[2]);
 		exit(1);
 	}
 
-	if ((outputfp = fopen(argv[3], "w")) == NULL) {
+	if ((outputfp = fopen(argv[3], "w")) == NULL) { // output record file이 open되지 않는다면 종료
 		fprintf(stderr, "fopen error for %s\n", argv[3]);
 		exit(1);
 	}
 
+
+	heaparray = (char **) malloc(sizeof(char *) * MAX_RECORD_COUNT); // heap sort에 사용할 배열 동적할당
 	buildHeap(inputfp, heaparray);
-
 	makeSortedFile(outputfp, heaparray);
-
+	for(i = 0; i < heap_element_count; ++i) { // heap sort에 사용한 배열 해제
+		free(heaparray[i]);
+	}
+	free(heaparray);
 
 	return 1;
 }
